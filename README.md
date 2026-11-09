@@ -2,6 +2,12 @@
 
 用视觉模型读取答题卡照片，并在核对后将答案逐题写入粉笔行测答题页。识别不使用 OCR，也不会自动提交答卷。
 
+## 大模型 API 准备
+
+本项目不提供 API Key，需要自行准备支持图片输入的视觉大模型 API。接口需兼容 OpenAI Chat Completions 的 `image_url` 格式，并在助手中填写 API 基础地址、模型名称和 API Key；调用费用由使用者自行承担。
+
+如需注册 API 服务，可使用[项目作者的邀请注册链接](https://api.aijws.com/register?aff=YGY82E9XPSFL)。也可以使用其他兼容的视觉模型服务商。
+
 ## 快速开始
 
 1. 安装 Python 3.8+ 与 Tampermonkey。
