@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.env
+.env.*
+*.log
+答题卡答案.json
+答题卡答案.txt
