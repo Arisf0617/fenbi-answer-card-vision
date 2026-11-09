@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         粉笔答题卡视觉识别录入助手
 // @namespace    local.fenbi.answercard
-// @version      1.2.1
+// @version      1.2.2
 // @description  在粉笔行测答题页识别答题卡并按题号录入（需要本地视觉模型服务）
 // @updateURL     https://raw.githubusercontent.com/Arisf0617/fenbi-answer-card-vision/main/粉笔答题卡助手.user.js
 // @downloadURL   https://raw.githubusercontent.com/Arisf0617/fenbi-answer-card-vision/main/粉笔答题卡助手.user.js
@@ -55,7 +55,8 @@
   style.textContent = `#fbac-root{position:fixed;z-index:2147483647;right:16px;top:90px;width:380px;max-height:calc(100vh - 110px);background:#fff;color:#25352d;border:1px solid #bed0c5;border-radius:8px;box-shadow:0 8px 32px #172a2033;font:13px/1.5 system-ui,"Microsoft YaHei",sans-serif}#fbac-root *{box-sizing:border-box}#fbac-head{background:#176c4c;color:white;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;border-radius:7px 7px 0 0;cursor:move}#fbac-body{padding:12px;overflow:auto;max-height:calc(100vh - 162px)}#fbac-root label{display:block;margin:8px 0 3px;color:#4d6256}#fbac-root input:not([type=checkbox]),#fbac-root select,#fbac-root textarea{display:block;width:100%;margin-top:3px;border:1px solid #c8d7ce;border-radius:4px;padding:6px;font:inherit;color:#24372d;background:white}#fbac-root input[type=file]{width:100%;font-size:12px}#fbac-root textarea{height:100px;resize:vertical;font-size:11px}#fbac-root button{border:1px solid #b7ccc0;border-radius:4px;background:#fff;color:#24563f;padding:6px 9px;cursor:pointer;font:inherit}#fbac-root button.primary{background:#176c4c;color:white;border-color:#176c4c}#fbac-root button:disabled{opacity:.5;cursor:wait}#fbac-root .fbac-row{display:flex;gap:7px;align-items:center}#fbac-root .fbac-row>*{flex:1;min-width:0}#fbac-root .fbac-hint{font-size:11px;color:#62766a;margin:5px 0}#fbac-status{white-space:pre-wrap;margin:8px 0;font-size:12px}#fbac-error{color:#a12d2d;white-space:pre-wrap}#fbac-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;max-height:205px;overflow:auto}#fbac-list label{margin:0;border:1px solid #d8e3dc;border-radius:4px;padding:4px;font-size:10px}#fbac-list label.warn{background:#fff7e6;border-color:#d9a344}#fbac-preview{width:100%;height:auto;max-height:none;object-fit:fill;display:block;cursor:crosshair;background:#edf1ef;margin-top:7px;touch-action:none;user-select:none}#fbac-preview[hidden]{display:none}#fbac-hidden{display:none}#fbac-root details summary{cursor:pointer;color:#176c4c}#fbac-min{border:0!important;background:transparent!important;color:white!important;font-size:18px!important;padding:0 4px!important}`;
   style.textContent += `
     #fbac-root .fbac-defaults{margin:8px 0}
-    #fbac-config-feedback{min-height:20px;margin:0 0 8px;font-size:12px;color:#176c4c}
+    #fbac-config-feedback{margin:0 0 5px;font-size:12px;color:#176c4c}
+    #fbac-config-feedback:empty{display:none}
     #fbac-config-feedback.error{color:#a12d2d}
     #fbac-connection{margin:4px 0 10px;font-size:12px;font-weight:600}
     #fbac-connection.ok{color:#16804a}
@@ -117,7 +118,7 @@
   const rangeRow=el('div',{className:'fbac-row'});rangeRow.append(field('起始题号',start),field('结束题号',end),field('选项数',choices));
   const actions=el('div',{className:'fbac-row'});actions.append(test,recognize);
   const writeActions=el('div',{className:'fbac-row'});writeActions.append(apply,cancel);
-  body.append(field('本地识别服务地址',endpoint),connection,field('模型 API 基础地址',base),field('视觉模型名称',model),field('API Key',key),configActions,configFeedback,el('p',{className:'fbac-hint'},'点击“保存配置”会将 API Key 一并存入 Tampermonkey 本地存储。'),field('答题卡照片',file),preview,cropInfo,
+  body.append(field('本地识别服务地址',endpoint),connection,field('模型 API 基础地址',base),field('视觉模型名称',model),field('API Key',key),configActions,configFeedback,el('p',{className:'fbac-hint'},'API Key 仅保存在 Tampermonkey 本地。'),field('答题卡照片',file),preview,cropInfo,
     el('p',{className:'fbac-hint'},'按住拖动框选答题区，松开后保留。用“恢复整图”取消裁剪。照片会发送给配置的模型服务商。'),
     rangeRow,sendTiles,actions,working,status,errorBox,el('hr'),el('strong',{},'识别结果（检查后再写入）'),list,sequence,
     el('p',{className:'fbac-hint'},'冲突答案默认跳过；疑问与空题不会录入。不会点击“交卷”。'),overLabel,writeActions);
@@ -169,7 +170,7 @@
   base.onchange=()=>GM_setValue('base',base.value.trim());model.onchange=()=>GM_setValue('model',model.value.trim());
   let promptEdited=false,connectionCheck=0;
   function setConnection(text,stateName){connection.className=stateName;connection.textContent=text;}
-  async function initialize(){const target=endpoint.value.trim();const check=++connectionCheck;setConnection('… 正在检测本地识别服务','checking');try{const c=await call('/api/config');if(check!==connectionCheck||target!==endpoint.value.trim())return;state.nonce=c.token;state.config=c;setConnection('✓ 本地服务已连接','ok');if(!promptEdited){const savedPrompt=GM_getValue('prompt',null);prompt.value=savedPrompt===null?c.prompt||'':savedPrompt;}try{for(let i=0;i<25;i++){try{refreshQuestions();break;}catch{if(i===24)throw Error('粉笔题目仍未加载，稍后刷新答题页');await new Promise(r=>setTimeout(r,400));}}status.textContent=`已发现 ${state.questions.size} 道单选题。可在答题页载入答题卡照片。`;}catch(e){errorBox.textContent=e.message;}}catch(e){if(check!==connectionCheck||target!==endpoint.value.trim())return;state.nonce='';setConnection('✕ 本地服务连接失败：'+e.message,'error');errorBox.textContent='本地连接未就绪：'+e.message;}}
+  async function initialize(){const target=endpoint.value.trim();const check=++connectionCheck;setConnection('… 正在检测本地识别服务','checking');try{const c=await call('/api/config');if(check!==connectionCheck||target!==endpoint.value.trim())return;state.nonce=c.token;state.config=c;setConnection('✓ 本地服务已连接','ok');if(!promptEdited){const savedPrompt=GM_getValue('prompt',null);prompt.value=savedPrompt===null?c.prompt||'':savedPrompt;}try{for(let i=0;i<25;i++){try{refreshQuestions();break;}catch{if(i===24)throw Error('粉笔题目仍未加载，稍后刷新答题页');await new Promise(r=>setTimeout(r,400));}}status.textContent=`已发现 ${state.questions.size} 道单选题。`;}catch(e){errorBox.textContent=e.message;}}catch(e){if(check!==connectionCheck||target!==endpoint.value.trim())return;state.nonce='';setConnection('✕ 本地服务连接失败：'+e.message,'error');errorBox.textContent='本地连接未就绪：'+e.message;}}
   prompt.oninput=()=>{promptEdited=true;try{GM_setValue('prompt',prompt.value);promptFeedback.className='';promptFeedback.textContent='提示词已自动保存';}catch(e){promptFeedback.className='error';promptFeedback.textContent='提示词保存失败：'+e.message;}};
   endpoint.oninput=()=>{openWeb.href=endpoint.value.trim().replace(/\/$/,'')+'/';};
   endpoint.onchange=()=>{GM_setValue('endpoint',endpoint.value.trim());state.nonce='';initialize();};
